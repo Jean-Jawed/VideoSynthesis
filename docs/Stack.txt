@@ -1,0 +1,14 @@
+On va donc devoir créer une application VideoSynthesis qui fonctionne avec plusieurs onglets : 
+
+- 1 onglet Settings avec le choix du modèle de transcription et le télachargement
+- 1 onglet DownloadVideo avec un URL, un champ d'affichage de log pour la partie yt-dlp
+- 1 onglet VideoToText avec un bouton Parcourir pour sélectionner la vidéo sur le disque et un champ d'affichage du texte facilement copiable
+- 1 onglet Synthesis avec un grand champ pour insérer du texte, un sélctionneur d'IA (Deepseek, Claude, Gemini, OpenAI) et un champ pour entrer sa clé API
+
+Stack : 
+
+Python avec Tkinter et Ctkinter pour l'interface
+Whisper (via openai-whisper) pour la transcription
+FFmpeg pour l'extraction audio
+yt-dlp pour le téchargement de l'audio à partir de l'url youtube
+les API Deepseek, Claude, Gemini, OpenAI pour la synthèse

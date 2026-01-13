@@ -1,0 +1,455 @@
+================================================================================
+                    VIDEO SYNTHESIS - SPECIFICATIONS
+================================================================================
+
+PROJECT OVERVIEW
+----------------
+Desktop application that downloads videos, transcribes audio to text using AI,
+and generates summaries using various LLM APIs.
+
+Target: Windows .exe compiled with PyInstaller (single file, no console)
+
+
+================================================================================
+TECHNICAL STACK
+================================================================================
+
+Languages & Frameworks:
+- Python 3.x
+- Tkinter + CustomTkinter (modern UI)
+
+Core Libraries:
+- openai-whisper : Audio transcription
+- yt-dlp : Video/audio downloading from URLs
+- FFmpeg : Audio extraction (bundled externally)
+
+API Integration:
+- DeepSeek API
+- Claude API (Anthropic)
+- Gemini API (Google)
+- OpenAI API
+
+Build Tool:
+- PyInstaller (--onefile --noconsole)
+
+
+================================================================================
+APPLICATION ARCHITECTURE
+================================================================================
+
+4 MAIN TABS:
+
+1. SETTINGS
+   - Download and manage required components
+   - FFmpeg download (~120 MB)
+   - Whisper model selection and download (Base/Medium/Large)
+   - Status indicators for each component
+
+2. DOWNLOAD VIDEO
+   - URL input field
+   - Download button
+   - Log display for yt-dlp progress
+   - Save path selector
+   - Auto-fill path to VideoToText tab after download
+
+3. VIDEO TO TEXT
+   - Browse button to select video/audio file
+   - Transcribe button
+   - Text display area (copyable)
+   - Progress indicator during transcription
+
+4. SYNTHESIS
+   - Large text input field (manual paste or auto-filled)
+   - API selector dropdown (DeepSeek/Claude/Gemini/OpenAI)
+   - API key input field
+   - Generate summary button
+   - Summary output display (copyable)
+
+
+================================================================================
+DETAILED FUNCTIONALITY
+================================================================================
+
+SETTINGS TAB
+------------
+Components Status:
+- Check if FFmpeg is installed
+  Location: %APPDATA%/VideoSynthesis/ffmpeg.exe
+  
+- Check if Whisper model is installed
+  Location: ~/.cache/whisper/[model_name].pt
+  
+Download Process:
+- FFmpeg: Download from GitHub, extract to AppData
+- Whisper: Use whisper.load_model() which auto-downloads to cache
+- Progress bars for downloads
+- Success/error messages
+
+First Launch Behavior:
+- Both components show "Not installed"
+- User must download before using other features
+
+
+DOWNLOAD VIDEO TAB
+------------------
+Input:
+- URL text field (YouTube, Vimeo, etc.)
+- Destination folder selector
+
+Process:
+1. Verify FFmpeg is installed (if not → show warning)
+2. Use yt-dlp to download audio only (mp3 format)
+3. Display download logs in real-time
+4. On success: auto-populate file path in VideoToText tab
+
+yt-dlp Configuration:
+```python
+options = {
+    'format': 'bestaudio',
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+    }],
+    'ffmpeg_location': get_ffmpeg_path(),
+    'outtmpl': '[user_selected_path]/%(title)s.%(ext)s'
+}
+```
+
+Error Handling:
+- Private/protected videos → user-friendly message
+- Network errors → display error, allow retry
+- Invalid URL → validation message
+
+
+VIDEO TO TEXT TAB
+-----------------
+Input:
+- File browser (select local video/audio file)
+- Or auto-populated from Download tab
+
+Process:
+1. Verify FFmpeg + Whisper model installed
+2. Extract audio if needed (FFmpeg)
+3. Run Whisper transcription
+4. Display progress
+5. Show transcribed text in copyable field
+
+Whisper Configuration:
+- Language: auto-detect
+- Model: user's choice from Settings (base/medium/large)
+
+Output:
+- Plain text display
+- Easy copy functionality
+- Optional: save to .txt file
+
+
+SYNTHESIS TAB
+-------------
+Input:
+- Large text field (manual input or auto-filled from VideoToText)
+- API selector: [DeepSeek | Claude | Gemini | OpenAI]
+- API key input field (stored in session memory only)
+
+Process for Long Text:
+1. Count words in input text
+2. If > 4000 words:
+   a. Split into chunks of ~4000 words
+   b. Send each chunk to selected API for mini-summary
+   c. Display progress: "Synthesizing chunk 1/5... 2/5..."
+   d. Collect all mini-summaries
+   e. Send combined mini-summaries to API for final coherent summary
+      (with prompt: "Merge these summaries, improve coherence, don't reduce")
+3. If ≤ 4000 words:
+   - Send directly for summary
+
+API Integration:
+- Support for multiple providers
+- API key validated on request
+- Error handling for rate limits, invalid keys, etc.
+
+Output:
+- Summary displayed in copyable text field
+- No export function needed
+
+
+================================================================================
+PREREQUISITES VERIFICATION SYSTEM
+================================================================================
+
+Global State:
+```python
+requirements = {
+    'ffmpeg': False,
+    'whisper': False
+}
+```
+
+Check on App Launch:
+- Verify FFmpeg exists in AppData
+- Verify Whisper model exists in cache
+- Update UI accordingly
+
+Tab-Specific Checks:
+
+Download Video:
+- Requires: FFmpeg only
+- Warning: "⚠️ FFmpeg not installed. Please check Settings tab."
+
+Video To Text:
+- Requires: FFmpeg + Whisper model
+- Warning: "⚠️ Missing: [components]. Please check Settings tab."
+
+Synthesis:
+- No prerequisites (only requires API key)
+
+Warning Display Strategy:
+- APPROACH: Clean interface, show popup on button click if missing
+- Popup message: "Missing requirements. Please install [X] in Settings tab."
+- Option to navigate directly to Settings tab
+
+
+================================================================================
+USER EXPERIENCE & UI DESIGN
+================================================================================
+
+Visual Style:
+- Modern, sophisticated aesthetic
+- Rounded corners on buttons and panels
+- Volume/depth on interactive elements
+- Clean color palette (designer's choice for blues/purples/cyans)
+- Light theme only
+
+Layout:
+- Tab navigation at top
+- Consistent padding and spacing
+- Clear section headers
+- Responsive element sizing
+
+Interactive Elements:
+- Buttons with hover effects
+- Progress bars for long operations
+- Real-time log displays
+- Copyable text areas with visual feedback
+
+Footer (on all tabs):
+- Copyright © Jawed Tahir 2025
+- Clickable link: "Visit website" → https://jawed.fr
+
+
+================================================================================
+ERROR HANDLING & LOGGING
+================================================================================
+
+User-Facing Errors:
+- Clear, actionable error messages
+- No technical jargon
+- Suggest solutions when possible
+
+Examples:
+- "Unable to download video (may be private or protected)"
+- "API key invalid. Please check your key and try again."
+- "Transcription failed. Please check the audio file."
+
+Background Logging:
+- Hidden log file: %APPDATA%/VideoSynthesis/app.log
+- Log all operations, errors, API calls
+- Timestamped entries
+- For debugging user issues
+
+Session Data:
+- API keys: stored in memory, cleared on app close
+- File paths: remembered during session
+- No persistent user data storage
+
+
+================================================================================
+PYINSTALLER BUILD CONFIGURATION
+================================================================================
+
+Command:
+```bash
+pyinstaller --onefile \
+            --noconsole \
+            --name "VideoSynthesis" \
+            --icon "icon.ico" \
+            main.py
+```
+
+Manual Steps Before Build:
+1. Ensure all dependencies in requirements.txt
+2. Test app in dev environment
+3. Prepare icon.ico file
+4. Verify FFmpeg download URLs in code
+
+Expected Output:
+- Single .exe file: ~300-500 MB
+- No external dependencies
+- Runs on Windows without Python installed
+
+Runtime Downloads (first launch):
+- FFmpeg: ~120 MB → AppData
+- Whisper model: 150 MB - 3 GB → user cache
+
+
+================================================================================
+FILE STRUCTURE & PATHS
+================================================================================
+
+Development Structure:
+```
+VideoSynthesis/
+├── main.py
+├── ui/
+│   ├── settings_tab.py
+│   ├── download_tab.py
+│   ├── videototext_tab.py
+│   └── synthesis_tab.py
+├── core/
+│   ├── downloader.py
+│   ├── transcriber.py
+│   ├── synthesizer.py
+│   └── requirements_checker.py
+├── utils/
+│   ├── ffmpeg_manager.py
+│   ├── whisper_manager.py
+│   └── logger.py
+├── assets/
+│   └── icon.ico
+└── requirements.txt
+```
+
+Runtime Paths (User's PC):
+```
+C:\Users\[Username]\AppData\Roaming\VideoSynthesis\
+├── ffmpeg.exe
+├── app.log
+└── config.json (if needed)
+
+C:\Users\[Username]\.cache\whisper\
+├── base.pt
+├── medium.pt
+└── large.pt
+```
+
+
+================================================================================
+DEVELOPMENT WORKFLOW
+================================================================================
+
+Phase 1: Development
+- Build UI with CustomTkinter
+- Implement each tab functionality
+- Test downloads, transcription, synthesis
+- Verify FFmpeg/Whisper auto-install
+
+Phase 2: Testing
+- Test on dev machine
+- Verify all error cases
+- Test long videos (1-2 hours)
+- Test all API providers
+- Test chunking logic for synthesis
+
+Phase 3: Packaging
+- Prepare PyInstaller spec
+- Build .exe
+- Test on clean Windows machine
+- Verify first-launch experience
+- Test all workflows end-to-end
+
+Phase 4: Distribution
+- Create installer (optional)
+- Prepare documentation
+- Release notes
+
+
+================================================================================
+FUTURE ENHANCEMENTS (NOT IN V1)
+================================================================================
+
+Possible Features:
+- Multi-language UI
+- Dark theme toggle
+- Batch processing multiple videos
+- Export summaries to PDF/DOCX
+- Video preview/playback
+- Transcript editing before synthesis
+- Custom synthesis prompts
+- Local LLM option (Ollama)
+- Translation support
+- Subtitle generation
+
+
+================================================================================
+TECHNICAL NOTES
+================================================================================
+
+Whisper Model Selection:
+- tiny: ~75 MB, fast, lower accuracy
+- base: ~150 MB, good balance (DEFAULT)
+- medium: ~1.5 GB, very good accuracy
+- large: ~3 GB, best accuracy, slowest
+
+API Cost Estimates (per 2-hour video):
+- Transcription: FREE (local Whisper)
+- Synthesis (~10,000 words):
+  * Claude: ~$0.01-0.05
+  * OpenAI: ~$0.02-0.10
+  * Gemini: ~$0.01-0.03
+  * DeepSeek: ~$0.001-0.01
+
+Performance Expectations:
+- Video download: depends on connection
+- Audio extraction: ~30 seconds for 2-hour video
+- Transcription (2 hours): 
+  * base model: ~20-30 minutes
+  * medium: ~40-60 minutes
+  * large: ~60-90 minutes
+- Synthesis: ~30-60 seconds per chunk
+
+
+================================================================================
+SECURITY & PRIVACY
+================================================================================
+
+Data Privacy:
+- All processing done locally (transcription)
+- Only synthesis text sent to external APIs
+- No data stored on servers
+- No telemetry or analytics
+
+API Keys:
+- Never logged or saved to disk
+- Stored in memory only during session
+- User responsible for key security
+- App does not validate or store credentials permanently
+
+User Data:
+- Videos/audio: user manages storage
+- Transcripts: displayed only, not auto-saved
+- Summaries: displayed only, user copies if needed
+- Logs: local only, no transmission
+
+
+================================================================================
+DEPENDENCIES (requirements.txt)
+================================================================================
+
+customtkinter>=5.2.0
+openai-whisper>=20231117
+yt-dlp>=2024.0.0
+requests>=2.31.0
+anthropic>=0.25.0
+openai>=1.0.0
+google-generativeai>=0.3.0
+Pillow>=10.0.0
+
+
+================================================================================
+END OF SPECIFICATIONS
+================================================================================
+
+Project: VideoSynthesis
+Version: 1.0
+Author: Jawed Tahir
+Last Updated: January 2026
