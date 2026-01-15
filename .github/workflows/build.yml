@@ -1,0 +1,161 @@
+name: Build VideoSynthesis Multi-Platform
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (optional)'
+        required: false
+        default: 'latest'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+        pip install -r requirements.txt
+    
+    - name: Get Whisper assets path
+      id: whisper-path
+      run: |
+        $WHISPER_PATH = python -c "import whisper, os; print(os.path.dirname(whisper.__file__))"
+        echo "WHISPER_PATH=$WHISPER_PATH" >> $env:GITHUB_ENV
+        echo "Whisper path: $WHISPER_PATH"
+    
+    - name: Build Windows executable
+      run: |
+        pyinstaller --onefile --noconsole `
+          --name "VideoSynthesis" `
+          --icon "assets/icon.ico" `
+          --add-data "$env:WHISPER_PATH/assets;whisper/assets" `
+          --clean main.py
+    
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: VideoSynthesis-Windows
+        path: dist/VideoSynthesis.exe
+        retention-days: 90
+
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+        pip install -r requirements.txt
+    
+    - name: Get Whisper assets path
+      id: whisper-path
+      run: |
+        WHISPER_PATH=$(python -c "import whisper, os; print(os.path.dirname(whisper.__file__))")
+        echo "WHISPER_PATH=$WHISPER_PATH" >> $GITHUB_ENV
+        echo "Whisper path: $WHISPER_PATH"
+    
+    - name: Build macOS application
+      run: |
+        pyinstaller --onefile --noconsole \
+          --name "VideoSynthesis" \
+          --icon "assets/icon.icns" \
+          --add-data "$WHISPER_PATH/assets:whisper/assets" \
+          --clean main.py
+    
+    - name: Create DMG (optional)
+      run: |
+        # Create a simple zip for now
+        cd dist
+        zip -r VideoSynthesis-macOS.zip VideoSynthesis.app
+    
+    - name: Upload macOS artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: VideoSynthesis-macOS
+        path: dist/VideoSynthesis-macOS.zip
+        retention-days: 90
+
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-tk python3-dev
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+        pip install -r requirements.txt
+    
+    - name: Get Whisper assets path
+      id: whisper-path
+      run: |
+        WHISPER_PATH=$(python -c "import whisper, os; print(os.path.dirname(whisper.__file__))")
+        echo "WHISPER_PATH=$WHISPER_PATH" >> $GITHUB_ENV
+        echo "Whisper path: $WHISPER_PATH"
+    
+    - name: Build Linux executable
+      run: |
+        pyinstaller --onefile --noconsole \
+          --name "VideoSynthesis" \
+          --add-data "$WHISPER_PATH/assets:whisper/assets" \
+          --clean main.py
+    
+    - name: Make executable
+      run: chmod +x dist/VideoSynthesis
+    
+    - name: Upload Linux artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: VideoSynthesis-Linux
+        path: dist/VideoSynthesis
+        retention-days: 90
+
+  create-release-summary:
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Create build summary
+      run: |
+        echo "# 🎉 Build Successful!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "All three platform builds completed successfully." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 📦 Download Artifacts:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Windows**: VideoSynthesis-Windows" >> $GITHUB_STEP_SUMMARY
+        echo "- **macOS**: VideoSynthesis-macOS" >> $GITHUB_STEP_SUMMARY
+        echo "- **Linux**: VideoSynthesis-Linux" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Artifacts are available in the Actions tab for 90 days." >> $GITHUB_STEP_SUMMARY
