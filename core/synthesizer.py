@@ -115,11 +115,31 @@ class TextSynthesizer:
         
         # Prepare prompt based on mode
         if mode == 'chunk':
-            prompt = f"Provide a comprehensive summary of the following text. Keep all important details and key points. IMPORTANT: Your response must be in the same language as the input text.\n\n{text}"
+            prompt = f"""CRITICAL INSTRUCTION: You MUST respond in the SAME LANGUAGE as the input text below.
+
+        Provide a comprehensive summary of the following text, keeping all important details and key points.
+
+        {text}
+
+        REMINDER: Your entire response MUST be in the SAME LANGUAGE as the text above. Do NOT translate."""
+
         elif mode == 'final':
-            prompt = f"The following are summaries of different sections of a longer text. Create a single, coherent, well-structured summary that combines these sections. Improve coherence and flow, but do not reduce the content further. IMPORTANT: Your response must be in the same language as the input summaries.\n\n{text}"
+            prompt = f"""CRITICAL INSTRUCTION: You MUST respond in the SAME LANGUAGE as the input summaries below.
+
+        The following are summaries of different sections of a longer text. Create a single, coherent, well-structured summary that combines these sections. Improve coherence and flow, but do not reduce the content further.
+
+        {text}
+
+        REMINDER: Your entire response MUST be in the SAME LANGUAGE as the summaries above. Do NOT translate."""
+
         else:  # direct
-            prompt = f"Provide a comprehensive and well-structured summary of the following text. IMPORTANT: Your response must be in the same language as the input text.\n\n{text}"
+            prompt = f"""CRITICAL INSTRUCTION: You MUST respond in the SAME LANGUAGE as the input text below.
+
+        Provide a comprehensive and well-structured summary of the following text.
+
+        {text}
+
+        REMINDER: Your entire response MUST be in the SAME LANGUAGE as the text above. Do NOT translate."""
         
         # Call the appropriate API
         if provider == "Claude":
