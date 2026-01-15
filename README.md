@@ -177,4 +177,4 @@ All rights reserved.
 
 For issues or questions, check the log file at `%APPDATA%/VideoSynthesis/app.log`
 
-Website: https://jawed.fr
+Website: https://javed.fr
