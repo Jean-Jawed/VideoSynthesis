@@ -48,6 +48,13 @@ class SettingsTab:
         # Whisper Section
         self.create_whisper_section(container)
         
+        # Separator
+        separator2 = ctk.CTkFrame(container, height=2, fg_color=("gray70", "gray30"))
+        separator2.pack(fill="x", pady=20)
+        
+        # Clean Computer Section
+        self.create_cleanup_section(container)
+        
         # Progress Section
         self.create_progress_section(container)
     
@@ -196,6 +203,118 @@ class SettingsTab:
         )
         self.progress_label.pack()
         self.progress_label.pack_forget()  # Hide initially
+    
+    def create_cleanup_section(self, parent):
+        """Create cleanup section with Clean Computer button"""
+        
+        cleanup_frame = ctk.CTkFrame(parent, corner_radius=10)
+        cleanup_frame.pack(fill="x", pady=10)
+        
+        # Header
+        header_frame = ctk.CTkFrame(cleanup_frame, fg_color="transparent")
+        header_frame.pack(fill="x", padx=20, pady=15)
+        
+        title = ctk.CTkLabel(
+            header_frame,
+            text="Clean Computer",
+            font=("Arial", 16, "bold")
+        )
+        title.pack(side="left")
+        
+        # Clean button
+        self.clean_btn = ctk.CTkButton(
+            header_frame,
+            text="Remove All Downloads",
+            width=180,
+            height=32,
+            corner_radius=8,
+            fg_color="#d32f2f",
+            hover_color="#b71c1c",
+            command=self.clean_computer
+        )
+        self.clean_btn.pack(side="right")
+        
+        # Info
+        info = ctk.CTkLabel(
+            cleanup_frame,
+            text="Remove FFmpeg and Whisper models to free up disk space. You can re-download them anytime.",
+            font=("Arial", 11),
+            text_color="gray"
+        )
+        info.pack(padx=20, pady=(0, 15))
+    
+    def clean_computer(self):
+        """Clean computer by removing FFmpeg and Whisper models"""
+        from tkinter import messagebox
+        
+        # Calculate sizes
+        ffmpeg_size = self.ffmpeg_manager.get_size()
+        whisper_size = self.whisper_manager.get_size()
+        total_size = ffmpeg_size + whisper_size
+        
+        if total_size == 0:
+            messagebox.showinfo(
+                "Nothing to Clean",
+                "No FFmpeg or Whisper models are currently installed."
+            )
+            return
+        
+        # Build message
+        items_to_remove = []
+        if ffmpeg_size > 0:
+            items_to_remove.append(f"• FFmpeg ({ffmpeg_size:.1f} MB)")
+        if whisper_size > 0:
+            items_to_remove.append(f"• Whisper models ({whisper_size:.1f} MB)")
+        
+        message = "The following items will be removed:\n\n"
+        message += "\n".join(items_to_remove)
+        message += f"\n\nTotal space to free: {total_size:.1f} MB"
+        message += "\n\nAre you sure you want to continue?"
+        
+        # Confirm with user
+        result = messagebox.askyesno(
+            "Confirm Cleanup",
+            message,
+            icon='warning'
+        )
+        
+        if not result:
+            return
+        
+        # Perform cleanup
+        success_messages = []
+        error_messages = []
+        
+        # Remove FFmpeg
+        if ffmpeg_size > 0:
+            success, msg = self.ffmpeg_manager.uninstall()
+            if success:
+                success_messages.append(msg)
+            else:
+                error_messages.append(msg)
+        
+        # Remove Whisper
+        if whisper_size > 0:
+            success, msg, models = self.whisper_manager.uninstall()
+            if success:
+                success_messages.append(msg)
+            else:
+                error_messages.append(msg)
+        
+        # Update UI
+        self.check_requirements()
+        
+        # Show result
+        if success_messages and not error_messages:
+            messagebox.showinfo(
+                "Cleanup Complete",
+                "\n".join(success_messages) + f"\n\nFreed {total_size:.1f} MB of disk space!"
+            )
+        elif error_messages:
+            messagebox.showerror(
+                "Cleanup Failed",
+                "\n".join(error_messages)
+            )
     
     def on_model_change(self, choice):
         """Handle model selection change"""

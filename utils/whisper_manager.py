@@ -136,7 +136,8 @@ class WhisperManager:
             return total_size / (1024 * 1024)  # Convert to MB
         except Exception:
             return 0
-
+    
+    def load_model(self, model_name='base'):
         """Load a Whisper model for transcription"""
         try:
             self.logger.info(f"Loading Whisper model: {model_name}")
