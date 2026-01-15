@@ -1,26 +1,23 @@
 """
-Video to Text Tab - Transcribe audio/video files using Whisper
+Video to Text Tab - Transcribe multiple audio/video files using Whisper
 """
 
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
-from core.transcriber import AudioTranscriber
-import os
+import time
+from tkinter import messagebox
+from ui.widgets import FileInputList, StatusLog
 
 
 class VideoToTextTab:
-    def __init__(self, parent, app_state, logger):
+    def __init__(self, parent, transcription_manager, logger):
         self.parent = parent
-        self.app_state = app_state
+        self.transcription_manager = transcription_manager
         self.logger = logger
         
-        self.transcriber = AudioTranscriber(logger)
-        self.current_file = None
+        # Set callback for status updates
+        self.transcription_manager.add_status_callback(self.update_status_display)
         
         self.setup_ui()
-        
-        # Check periodically for downloaded files
-        self.check_downloaded_file()
     
     def setup_ui(self):
         """Create the Video to Text tab UI"""
@@ -29,267 +26,183 @@ class VideoToTextTab:
         container = ctk.CTkFrame(self.parent, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=20, pady=20)
         
+        # Configure grid
+        container.grid_rowconfigure(3, weight=1)
+        container.grid_columnconfigure(0, weight=1)
+        
         # Title
         title_label = ctk.CTkLabel(
             container,
             text="Video to Text Transcription",
             font=("Arial", 20, "bold")
         )
-        title_label.pack(pady=(0, 20))
+        title_label.grid(row=0, column=0, sticky="w", pady=(0, 20))
         
         # File Selection Section
         file_frame = ctk.CTkFrame(container, corner_radius=10)
-        file_frame.pack(fill="x", pady=10)
+        file_frame.grid(row=1, column=0, sticky="ew", pady=(0, 10))
         
-        file_label = ctk.CTkLabel(
-            file_frame,
-            text="Select Audio/Video File:",
-            font=("Arial", 14)
-        )
-        file_label.pack(anchor="w", padx=20, pady=(15, 5))
-        
-        file_input_frame = ctk.CTkFrame(file_frame, fg_color="transparent")
-        file_input_frame.pack(fill="x", padx=20, pady=(0, 15))
-        
-        self.file_entry = ctk.CTkEntry(
-            file_input_frame,
-            placeholder_text="No file selected...",
-            height=40,
-            corner_radius=8,
-            font=("Arial", 12)
-        )
-        self.file_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
-        
-        browse_btn = ctk.CTkButton(
-            file_input_frame,
-            text="Browse",
-            width=100,
-            height=40,
-            corner_radius=8,
-            command=self.browse_file
-        )
-        browse_btn.pack(side="right")
+        # File Input List Widget
+        self.file_list = FileInputList(file_frame, fg_color="transparent")
+        self.file_list.pack(fill="x", padx=20, pady=15)
         
         # Transcribe Button
         self.transcribe_btn = ctk.CTkButton(
             container,
-            text="Transcribe Audio (~15 min per hour of audio)",
+            text="Transcribe All Files",
             height=45,
             corner_radius=10,
             font=("Arial", 14, "bold"),
-            command=self.start_transcription
+            command=self.start_transcriptions
         )
-        self.transcribe_btn.pack(fill="x", pady=15)
+        self.transcribe_btn.grid(row=2, column=0, sticky="ew", pady=15)
         
-        # Progress Section
-        self.progress_frame = ctk.CTkFrame(container, fg_color="transparent")
-        self.progress_frame.pack(fill="x")
-        self.progress_frame.pack_forget()  # Hidden initially
+        # Status Log Section
+        self.status_log = StatusLog(container, title="Transcription Status:")
+        self.status_log.grid(row=3, column=0, sticky="nsew", pady=(0, 10))
         
-        self.progress_bar = ctk.CTkProgressBar(
-            self.progress_frame,
-            height=20,
-            corner_radius=10
+        # Action buttons
+        action_frame = ctk.CTkFrame(container, fg_color="transparent")
+        action_frame.grid(row=4, column=0, sticky="ew", pady=(0, 10))
+        
+        # Info label
+        info_label = ctk.CTkLabel(
+            action_frame,
+            text="💡 Completed transcriptions appear in the 'Transcription Results' tab",
+            font=("Arial", 11),
+            text_color="gray50"
         )
-        self.progress_bar.pack(fill="x", pady=(0, 10))
+        info_label.pack(side="left")
         
-        self.progress_label = ctk.CTkLabel(
-            self.progress_frame,
-            text="",
-            font=("Arial", 12)
-        )
-        self.progress_label.pack()
-        
-        # Transcription Output Section
-        output_frame = ctk.CTkFrame(container, corner_radius=10)
-        output_frame.pack(fill="both", expand=True, pady=10)
-        
-        output_header = ctk.CTkFrame(output_frame, fg_color="transparent")
-        output_header.pack(fill="x", padx=20, pady=(15, 5))
-        
-        output_label = ctk.CTkLabel(
-            output_header,
-            text="Transcribed Text:",
-            font=("Arial", 14)
-        )
-        output_label.pack(side="left")
-        
-        # Copy button
-        self.copy_btn = ctk.CTkButton(
-            output_header,
-            text="Copy Text",
-            width=100,
-            height=28,
-            corner_radius=6,
-            command=self.copy_text,
-            state="disabled"
-        )
-        self.copy_btn.pack(side="right")
-        
-        # Send to Synthesis button
-        self.send_synthesis_btn = ctk.CTkButton(
-            output_header,
-            text="Send to Synthesis",
+        clear_btn = ctk.CTkButton(
+            action_frame,
+            text="Clear Completed",
             width=140,
-            height=28,
-            corner_radius=6,
-            command=self.send_to_synthesis,
-            state="disabled"
-        )
-        self.send_synthesis_btn.pack(side="right", padx=(0, 10))
-        
-        self.text_output = ctk.CTkTextbox(
-            output_frame,
-            font=("Arial", 12),
+            height=32,
             corner_radius=8,
-            wrap="word"
+            command=self.clear_completed
         )
-        self.text_output.pack(fill="both", expand=True, padx=20, pady=(0, 15))
-    
-    def browse_file(self):
-        """Open file browser for audio/video file"""
-        filetypes = [
-            ("Media files", "*.mp3 *.mp4 *.wav *.m4a *.avi *.mkv *.flac"),
-            ("All files", "*.*")
-        ]
-        
-        filename = filedialog.askopenfilename(
-            title="Select Audio/Video File",
-            filetypes=filetypes
-        )
-        
-        if filename:
-            # Normalize path to handle Windows/Linux differences
-            filename = os.path.normpath(filename)
-            self.file_entry.delete(0, "end")
-            self.file_entry.insert(0, filename)
-            self.current_file = filename
-    
-    def check_downloaded_file(self):
-        """Check if a file was downloaded and auto-fill"""
-        if self.app_state.get('downloaded_file_path'):
-            filepath = self.app_state['downloaded_file_path']
-            if os.path.exists(filepath):
-                self.file_entry.delete(0, "end")
-                self.file_entry.insert(0, filepath)
-                self.current_file = filepath
-                
-                # Check if we should auto-switch to this tab
-                if self.app_state.get('switch_to_transcribe'):
-                    self.app_state['switch_to_transcribe'] = False
-            
-            # Clear the flag
-            self.app_state['downloaded_file_path'] = None
-        
-        # Check again in 500ms
-        self.parent.after(500, self.check_downloaded_file)
+        clear_btn.pack(side="right")
     
     def check_prerequisites(self):
         """Check if FFmpeg and Whisper are installed"""
-        missing = []
-        
-        if not self.app_state['requirements']['ffmpeg']:
-            missing.append("FFmpeg")
-        
-        if not self.app_state['requirements']['whisper']:
-            missing.append("Whisper model")
-        
-        if missing:
-            messagebox.showwarning(
-                "Missing Requirements",
-                f"Missing: {', '.join(missing)}\n\nPlease download them in the Settings tab first."
-            )
-            return False
-        
-        return True
+        # Access app_state from parent's parent (main app)
+        try:
+            app_state = self.parent.master.master.app_state
+            missing = []
+            
+            if not app_state['requirements']['ffmpeg']:
+                missing.append("FFmpeg")
+            
+            if not app_state['requirements']['whisper']:
+                missing.append("Whisper model")
+            
+            if missing:
+                messagebox.showwarning(
+                    "Missing Requirements",
+                    f"Missing: {', '.join(missing)}\n\nPlease download them in the Settings tab first."
+                )
+                return False
+            
+            return True
+        except:
+            # If we can't access app_state, assume prerequisites are met
+            return True
     
-    def start_transcription(self):
-        """Start audio transcription"""
+    def start_transcriptions(self):
+        """Start transcribing all files"""
         
         # Check prerequisites
         if not self.check_prerequisites():
             return
         
-        # Get file path from entry field (more reliable)
-        file_path = self.file_entry.get().strip()
-        
-        # Normalize path (handle Windows/Linux differences)
-        if file_path:
-            file_path = os.path.normpath(file_path)
-            self.current_file = file_path
-        
-        # Validate file
-        if not self.current_file:
-            messagebox.showerror("Error", "Please select an audio/video file")
+        # Get files
+        files = self.file_list.get_files()
+        if not files:
+            messagebox.showerror("Error", "Please select at least one audio/video file")
             return
         
-        if not os.path.exists(self.current_file):
-            messagebox.showerror(
-                "Error", 
-                f"File not found:\n{self.current_file}\n\nPlease check the file path."
+        # Add all transcriptions to manager
+        self.logger.info(f"Starting {len(files)} transcriptions")
+        
+        for file_info in files:
+            task_id = self.transcription_manager.add_transcription(
+                file_info['path'],
+                file_info['name']
             )
-            return
         
-        # Clear previous output
-        self.text_output.delete("1.0", "end")
+        # Update button text
+        self.update_transcribe_button()
         
-        # Show progress
-        self.progress_frame.pack(fill="x", pady=(0, 10))
-        self.progress_bar.set(0)
-        self.progress_label.configure(text="Initializing transcription...")
-        
-        # Disable buttons
-        self.transcribe_btn.configure(state="disabled", text="Transcribing...")
-        self.copy_btn.configure(state="disabled")
-        self.send_synthesis_btn.configure(state="disabled")
-        
-        self.logger.info(f"Starting transcription: {self.current_file}")
-        
-        def progress_callback(percent, message):
-            self.progress_bar.set(percent / 100)
-            self.progress_label.configure(text=message)
-        
-        def completion_callback(success, text, message):
-            self.transcribe_btn.configure(state="normal", text="Transcribe Audio")
-            
-            if success:
-                self.progress_label.configure(text="✓ Transcription complete!", text_color="green")
-                self.text_output.insert("1.0", text)
-                self.copy_btn.configure(state="normal")
-                self.send_synthesis_btn.configure(state="normal")
-                
-                # Store in app state
-                self.app_state['transcribed_text'] = text
-                
-                messagebox.showinfo(
-                    "Transcription Complete",
-                    f"Transcription completed successfully!\n\nWord count: {len(text.split())} words"
-                )
-            else:
-                self.progress_label.configure(text=f"✗ {message}", text_color="red")
-                messagebox.showerror("Transcription Failed", message)
-        
-        # Start transcription
-        self.transcriber.transcribe(
-            self.current_file,
-            progress_callback,
-            completion_callback
+        # Show info message
+        messagebox.showinfo(
+            "Transcriptions Started",
+            f"Added {len(files)} file(s) to the transcription queue.\n\nResults will appear in the 'Transcription Results' tab as they complete."
         )
     
-    def copy_text(self):
-        """Copy transcribed text to clipboard"""
-        text = self.text_output.get("1.0", "end-1c")
-        if text.strip():
-            self.parent.clipboard_clear()
-            self.parent.clipboard_append(text)
-            messagebox.showinfo("Copied", "Text copied to clipboard!")
+    def update_status_display(self):
+        """Update the status log display (called from transcription manager)"""
+        # Rate limit UI updates
+        now = time.time()
+        if hasattr(self, '_last_update') and now - self._last_update < 0.1:
+            return
+        self._last_update = now
+        
+        # This needs to run on the main thread
+        try:
+            self.parent.after(0, self._update_status_display_impl)
+        except:
+            pass
     
-    def send_to_synthesis(self):
-        """Send transcribed text to Synthesis tab"""
-        text = self.text_output.get("1.0", "end-1c")
-        if text.strip():
-            self.app_state['transcribed_text'] = text
-            messagebox.showinfo(
-                "Text Sent",
-                "Transcribed text has been sent to the Synthesis tab.\n\nPlease switch to the Synthesis tab to generate a summary."
-            )
+    def _update_status_display_impl(self):
+        """Implementation of status display update"""
+        try:
+            # Get all tasks
+            tasks = self.transcription_manager.get_all_tasks()
+            
+            # Update each task in the log
+            for task in tasks:
+                # Get queue position if queued
+                queue_pos = self.transcription_manager.get_queue_position(task.id)
+                message = task.message
+                if queue_pos:
+                    message = f"Queued (position {queue_pos})"
+                
+                self.status_log.update_task(
+                    task.id,
+                    task.status.value,
+                    message,
+                    name=task.filename,
+                    progress=task.progress
+                )
+            
+            # Update summary
+            summary = self.transcription_manager.get_summary()
+            self.status_log.set_summary_from_stats(summary)
+            
+            # Update button
+            self.update_transcribe_button()
+            
+            # Force UI update to show changes immediately
+            try:
+                self.parent.update_idletasks()
+            except:
+                pass
+            
+        except Exception as e:
+            self.logger.error(f"Error updating status display: {e}")
+    
+    def update_transcribe_button(self):
+        """Update transcribe button text based on file count"""
+        file_count = self.file_list.get_count()
+        if file_count == 0:
+            self.transcribe_btn.configure(text="Transcribe All Files")
+        elif file_count == 1:
+            self.transcribe_btn.configure(text="Transcribe Audio (1 file)")
+        else:
+            self.transcribe_btn.configure(text=f"Transcribe All Files ({file_count} files)")
+    
+    def clear_completed(self):
+        """Clear completed and failed transcriptions from status log"""
+        self.transcription_manager.clear_completed()
+        self.update_status_display()

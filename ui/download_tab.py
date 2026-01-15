@@ -1,10 +1,12 @@
 """
-Download Video Tab - Download videos from URLs using yt-dlp
+Download Video Tab - Download multiple videos from URLs using yt-dlp
 """
 
 import customtkinter as ctk
+import time
 from tkinter import filedialog, messagebox
-from core.downloader import VideoDownloader
+from core.download_manager import DownloadManager
+from ui.widgets import URLInputList, StatusLog
 
 
 class DownloadTab:
@@ -13,7 +15,10 @@ class DownloadTab:
         self.app_state = app_state
         self.logger = logger
         
-        self.downloader = VideoDownloader(logger)
+        # Initialize download manager
+        self.download_manager = DownloadManager(logger, max_concurrent=3)
+        self.download_manager.set_status_callback(self.update_status_display)
+        
         self.download_path = None
         
         self.setup_ui()
@@ -25,97 +30,92 @@ class DownloadTab:
         container = ctk.CTkFrame(self.parent, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=20, pady=20)
         
+        # Configure grid
+        container.grid_rowconfigure(3, weight=1)
+        container.grid_columnconfigure(0, weight=1)
+        
         # Title
         title_label = ctk.CTkLabel(
             container,
-            text="Download Video",
+            text="Download Videos",
             font=("Arial", 20, "bold")
         )
-        title_label.pack(pady=(0, 20))
+        title_label.grid(row=0, column=0, sticky="w", pady=(0, 20))
         
         # URL Input Section
         url_frame = ctk.CTkFrame(container, corner_radius=10)
-        url_frame.pack(fill="x", pady=10)
+        url_frame.grid(row=1, column=0, sticky="ew", pady=(0, 10))
         
-        url_label = ctk.CTkLabel(
-            url_frame,
-            text="Video URL:",
-            font=("Arial", 14)
-        )
-        url_label.pack(anchor="w", padx=20, pady=(15, 5))
-        
-        self.url_entry = ctk.CTkEntry(
-            url_frame,
-            placeholder_text="https://www.youtube.com/watch?v=...",
-            height=40,
-            corner_radius=8,
-            font=("Arial", 12)
-        )
-        self.url_entry.pack(fill="x", padx=20, pady=(0, 15))
+        # URL Input List Widget
+        self.url_list = URLInputList(url_frame, fg_color="transparent")
+        self.url_list.pack(fill="x", padx=20, pady=15)
         
         # Destination Section
         dest_frame = ctk.CTkFrame(container, corner_radius=10)
-        dest_frame.pack(fill="x", pady=10)
+        dest_frame.grid(row=2, column=0, sticky="ew", pady=10)
+        
+        dest_inner = ctk.CTkFrame(dest_frame, fg_color="transparent")
+        dest_inner.pack(fill="x", padx=20, pady=15)
+        dest_inner.grid_columnconfigure(0, weight=1)
         
         dest_label = ctk.CTkLabel(
-            dest_frame,
+            dest_inner,
             text="Save Location:",
             font=("Arial", 14)
         )
-        dest_label.pack(anchor="w", padx=20, pady=(15, 5))
+        dest_label.grid(row=0, column=0, sticky="w", pady=(0, 5))
         
-        dest_input_frame = ctk.CTkFrame(dest_frame, fg_color="transparent")
-        dest_input_frame.pack(fill="x", padx=20, pady=(0, 15))
+        dest_input_frame = ctk.CTkFrame(dest_inner, fg_color="transparent")
+        dest_input_frame.grid(row=1, column=0, sticky="ew")
+        dest_input_frame.grid_columnconfigure(0, weight=1)
         
         self.dest_entry = ctk.CTkEntry(
             dest_input_frame,
             placeholder_text="Select destination folder...",
-            height=40,
+            height=35,
             corner_radius=8,
-            font=("Arial", 12)
+            font=("Arial", 11)
         )
-        self.dest_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self.dest_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
         
         browse_btn = ctk.CTkButton(
             dest_input_frame,
             text="Browse",
             width=100,
-            height=40,
+            height=35,
             corner_radius=8,
             command=self.browse_destination
         )
-        browse_btn.pack(side="right")
+        browse_btn.grid(row=0, column=1)
         
         # Download Button
         self.download_btn = ctk.CTkButton(
             container,
-            text="Download Audio",
+            text="Download All Audio",
             height=45,
             corner_radius=10,
             font=("Arial", 14, "bold"),
-            command=self.start_download
+            command=self.start_downloads
         )
-        self.download_btn.pack(fill="x", pady=15)
+        self.download_btn.grid(row=3, column=0, sticky="ew", pady=15)
         
-        # Log Section
-        log_frame = ctk.CTkFrame(container, corner_radius=10)
-        log_frame.pack(fill="both", expand=True, pady=10)
+        # Status Log Section
+        self.status_log = StatusLog(container, title="Download Status:")
+        self.status_log.grid(row=4, column=0, sticky="nsew", pady=(0, 10))
         
-        log_label = ctk.CTkLabel(
-            log_frame,
-            text="Download Log:",
-            font=("Arial", 14)
-        )
-        log_label.pack(anchor="w", padx=20, pady=(15, 5))
+        # Action buttons
+        action_frame = ctk.CTkFrame(container, fg_color="transparent")
+        action_frame.grid(row=5, column=0, sticky="ew")
         
-        self.log_text = ctk.CTkTextbox(
-            log_frame,
-            font=("Courier", 11),
+        clear_btn = ctk.CTkButton(
+            action_frame,
+            text="Clear Completed",
+            width=140,
+            height=32,
             corner_radius=8,
-            wrap="word"
+            command=self.clear_completed
         )
-        self.log_text.pack(fill="both", expand=True, padx=20, pady=(0, 15))
-        self.log_text.configure(state="disabled")
+        clear_btn.pack(side="right")
     
     def browse_destination(self):
         """Open folder browser for destination"""
@@ -124,13 +124,6 @@ class DownloadTab:
             self.dest_entry.delete(0, "end")
             self.dest_entry.insert(0, folder)
             self.download_path = folder
-    
-    def append_log(self, message):
-        """Append message to log textbox"""
-        self.log_text.configure(state="normal")
-        self.log_text.insert("end", message + "\n")
-        self.log_text.see("end")
-        self.log_text.configure(state="disabled")
     
     def check_prerequisites(self):
         """Check if FFmpeg is installed"""
@@ -142,71 +135,90 @@ class DownloadTab:
             return False
         return True
     
-    def start_download(self):
-        """Start video download process"""
+    def start_downloads(self):
+        """Start downloading all URLs"""
         
         # Check prerequisites
         if not self.check_prerequisites():
             return
         
-        # Validate inputs
-        url = self.url_entry.get().strip()
-        if not url:
-            messagebox.showerror("Error", "Please enter a video URL")
+        # Get URLs
+        urls = self.url_list.get_urls()
+        if not urls:
+            messagebox.showerror("Error", "Please enter at least one video URL")
             return
         
+        # Check destination
         if not self.download_path:
             messagebox.showerror("Error", "Please select a destination folder")
             return
         
-        # Clear log
-        self.log_text.configure(state="normal")
-        self.log_text.delete("1.0", "end")
-        self.log_text.configure(state="disabled")
+        # Add all downloads to manager
+        self.logger.info(f"Starting {len(urls)} downloads")
         
-        # Disable download button
-        self.download_btn.configure(state="disabled", text="Downloading...")
+        for url in urls:
+            self.download_manager.add_download(url, self.download_path)
         
-        self.logger.info(f"Starting download: {url}")
-        self.append_log(f"Starting download from: {url}")
-        self.append_log(f"Destination: {self.download_path}\n")
+        # Update button text
+        self.update_download_button()
+    
+    def update_status_display(self):
+        """Update the status log display (called from download manager)"""
+        # Rate limit UI updates to avoid freezing (max every 100ms)
+        now = time.time()
+        if hasattr(self, '_last_update') and now - self._last_update < 0.1:
+            return
+        self._last_update = now
         
-        def progress_callback(message):
-            self.append_log(message)
-        
-        def completion_callback(success, output_file, message):
-            self.download_btn.configure(state="normal", text="Download Audio")
+        # This needs to run on the main thread
+        try:
+            self.parent.after(0, self._update_status_display_impl)
+        except:
+            pass
+    
+    def _update_status_display_impl(self):
+        """Implementation of status display update"""
+        try:
+            # Get all tasks
+            tasks = self.download_manager.get_all_tasks()
             
-            if success:
-                self.append_log("\n" + "="*50)
-                self.append_log(f"✓ Download successful!")
-                self.append_log(f"File saved: {output_file}")
-                self.append_log("="*50)
-                
-                # Store the downloaded file path in app state
-                self.app_state['downloaded_file_path'] = output_file
-                
-                # Ask if user wants to transcribe now
-                result = messagebox.askyesno(
-                    "Download Complete",
-                    "Download completed successfully!\n\nWould you like to transcribe this file now?"
+            # Update each task in the log
+            for task in tasks:
+                self.status_log.update_task(
+                    task.id,
+                    task.status.value,
+                    task.message,
+                    name=f"URL {tasks.index(task) + 1}",
+                    progress=task.progress
                 )
-                
-                if result:
-                    # Switch to VideoToText tab
-                    # Note: This requires access to the main app's tabview
-                    # We'll handle this through the app_state
-                    self.app_state['switch_to_transcribe'] = True
-            else:
-                self.append_log("\n" + "="*50)
-                self.append_log(f"✗ Download failed: {message}")
-                self.append_log("="*50)
-                messagebox.showerror("Download Failed", message)
-        
-        # Start download
-        self.downloader.download(
-            url,
-            self.download_path,
-            progress_callback,
-            completion_callback
-        )
+            
+            # Update summary
+            summary = self.download_manager.get_summary()
+            self.status_log.set_summary_from_stats(summary)
+            
+            # Update button
+            self.update_download_button()
+            
+            # Force UI update to show changes immediately
+            try:
+                self.parent.update_idletasks()
+            except:
+                pass
+            
+        except Exception as e:
+            self.logger.error(f"Error updating status display: {e}")
+    
+    def update_download_button(self):
+        """Update download button text based on URL count"""
+        url_count = self.url_list.get_count()
+        if url_count == 0:
+            self.download_btn.configure(text="Download All Audio")
+        elif url_count == 1:
+            self.download_btn.configure(text="Download Audio (1 URL)")
+        else:
+            self.download_btn.configure(text=f"Download All Audio ({url_count} URLs)")
+    
+    def clear_completed(self):
+        """Clear completed and failed downloads"""
+        self.download_manager.clear_completed()
+        self.update_status_display()

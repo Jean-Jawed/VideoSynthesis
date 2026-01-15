@@ -45,6 +45,50 @@ class FFmpegManager:
         # Return downloaded FFmpeg path
         return str(self.ffmpeg_path) if self.is_installed() else None
     
+    def get_audio_duration(self, file_path):
+        """
+        Get duration of audio/video file in seconds using ffmpeg
+        
+        Args:
+            file_path: Path to media file
+            
+        Returns:
+            float: Duration in seconds, or 0.0 if failed
+        """
+        import subprocess
+        import re
+        
+        ffmpeg_path = self.get_path()
+        if not ffmpeg_path:
+            return 0.0
+            
+        try:
+            # Use ffmpeg -i to get info (faster than full scan)
+            # We use subprocess.PIPE to capture stderr where ffmpeg puts metadata info
+            cmd = [ffmpeg_path, '-i', file_path]
+            # On Windows, hide the console window
+            startupinfo = None
+            if os.name == 'nt':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                
+            result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore', startupinfo=startupinfo)
+            
+            # Look for Duration: 00:00:00.00
+            match = re.search(r"Duration:\s(\d+):(\d+):(\d+\.\d+)", result.stderr)
+            if match:
+                hours = int(match.group(1))
+                minutes = int(match.group(2))
+                seconds = float(match.group(3))
+                duration = hours * 3600 + minutes * 60 + seconds
+                self.logger.debug(f"File duration: {duration}s - {file_path}")
+                return duration
+                
+        except Exception as e:
+            self.logger.error(f"Failed to get duration for {file_path}: {e}")
+            
+        return 0.0
+    
     def download(self, progress_callback=None, completion_callback=None):
         """
         Download FFmpeg in a separate thread

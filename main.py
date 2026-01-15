@@ -10,7 +10,9 @@ import os
 from ui.settings_tab import SettingsTab
 from ui.download_tab import DownloadTab
 from ui.videototext_tab import VideoToTextTab
+from ui.transcription_results_tab import TranscriptionResultsTab
 from ui.synthesis_tab import SynthesisTab
+from core.transcription_manager import TranscriptionManager
 from utils.logger import setup_logger
 import webbrowser
 
@@ -113,7 +115,11 @@ class VideoSynthesisApp(ctk.CTk):
         self.tabview.add("Settings")
         self.tabview.add("Download Video")
         self.tabview.add("Video to Text")
+        self.tabview.add("Transcription Results")
         self.tabview.add("Synthesis")
+        
+        # Create shared transcription manager
+        self.transcription_manager = TranscriptionManager(self.logger)
         
         # Initialize tab contents
         self.settings_tab = SettingsTab(
@@ -130,7 +136,13 @@ class VideoSynthesisApp(ctk.CTk):
         
         self.videototext_tab = VideoToTextTab(
             self.tabview.tab("Video to Text"),
-            self.app_state,
+            self.transcription_manager,
+            self.logger
+        )
+        
+        self.transcription_results_tab = TranscriptionResultsTab(
+            self.tabview.tab("Transcription Results"),
+            self.transcription_manager,
             self.logger
         )
         
