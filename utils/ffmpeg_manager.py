@@ -117,3 +117,46 @@ class FFmpegManager:
         # Start download in separate thread
         thread = Thread(target=_download, daemon=True)
         thread.start()
+    
+    def uninstall(self):
+        """
+        Uninstall FFmpeg by removing the executable and directory
+        
+        Returns:
+            tuple: (success: bool, message: str)
+        """
+        try:
+            if not self.is_installed():
+                return (False, "FFmpeg is not installed")
+            
+            # Remove FFmpeg executable
+            if self.ffmpeg_path.exists():
+                self.ffmpeg_path.unlink()
+                self.logger.info(f"Removed FFmpeg executable: {self.ffmpeg_path}")
+            
+            # Remove directory if empty
+            if self.ffmpeg_dir.exists() and not any(self.ffmpeg_dir.iterdir()):
+                self.ffmpeg_dir.rmdir()
+                self.logger.info(f"Removed empty directory: {self.ffmpeg_dir}")
+            
+            return (True, "FFmpeg uninstalled successfully")
+            
+        except Exception as e:
+            error_msg = f"Failed to uninstall FFmpeg: {str(e)}"
+            self.logger.error(error_msg)
+            return (False, error_msg)
+    
+    def get_size(self):
+        """
+        Get the size of FFmpeg installation in MB
+        
+        Returns:
+            float: Size in MB, or 0 if not installed
+        """
+        try:
+            if self.ffmpeg_path.exists():
+                size_bytes = self.ffmpeg_path.stat().st_size
+                return size_bytes / (1024 * 1024)  # Convert to MB
+            return 0
+        except Exception:
+            return 0

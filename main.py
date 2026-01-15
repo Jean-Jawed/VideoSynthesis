@@ -5,12 +5,20 @@ Copyright © Jawed Tahir 2025
 
 import customtkinter as ctk
 import tkinter as tk
+import sys
+import os
 from ui.settings_tab import SettingsTab
 from ui.download_tab import DownloadTab
 from ui.videototext_tab import VideoToTextTab
 from ui.synthesis_tab import SynthesisTab
 from utils.logger import setup_logger
 import webbrowser
+
+# Fix for PyInstaller --noconsole: redirect stdout/stderr to avoid crashes
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, 'w')
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, 'w')
 
 # Set appearance and color theme
 ctk.set_appearance_mode("light")

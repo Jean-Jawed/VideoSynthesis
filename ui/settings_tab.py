@@ -33,7 +33,7 @@ class SettingsTab:
         # Title
         title_label = ctk.CTkLabel(
             container,
-            text="Settings - Required Components",
+            text="Settings - Required Components: Download only at first use",
             font=("Arial", 20, "bold")
         )
         title_label.pack(pady=(0, 20))
@@ -91,7 +91,7 @@ class SettingsTab:
         # Info
         info = ctk.CTkLabel(
             ffmpeg_frame,
-            text="Size: ~120 MB • Required for video/audio processing",
+            text="Size: ~120 MB • Required for video/audio processing • Estimated time : 10 min",
             font=("Arial", 11),
             text_color="gray"
         )
@@ -168,7 +168,7 @@ class SettingsTab:
         # Info
         info = ctk.CTkLabel(
             whisper_frame,
-            text="Required for audio transcription • Larger models = better accuracy",
+            text="Required for audio transcription • Larger models = better accuracy • Estimated time : 2 min",
             font=("Arial", 11),
             text_color="gray"
         )

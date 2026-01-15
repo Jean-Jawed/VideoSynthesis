@@ -115,11 +115,11 @@ class TextSynthesizer:
         
         # Prepare prompt based on mode
         if mode == 'chunk':
-            prompt = f"Provide a comprehensive summary of the following text. Keep all important details and key points:\n\n{text}"
+            prompt = f"Provide a comprehensive summary of the following text. Keep all important details and key points. IMPORTANT: Your response must be in the same language as the input text.\n\n{text}"
         elif mode == 'final':
-            prompt = f"The following are summaries of different sections of a longer text. Create a single, coherent, well-structured summary that combines these sections. Improve coherence and flow, but do not reduce the content further:\n\n{text}"
+            prompt = f"The following are summaries of different sections of a longer text. Create a single, coherent, well-structured summary that combines these sections. Improve coherence and flow, but do not reduce the content further. IMPORTANT: Your response must be in the same language as the input summaries.\n\n{text}"
         else:  # direct
-            prompt = f"Provide a comprehensive and well-structured summary of the following text:\n\n{text}"
+            prompt = f"Provide a comprehensive and well-structured summary of the following text. IMPORTANT: Your response must be in the same language as the input text.\n\n{text}"
         
         # Call the appropriate API
         if provider == "Claude":

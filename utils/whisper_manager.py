@@ -85,7 +85,58 @@ class WhisperManager:
         thread = Thread(target=_download, daemon=True)
         thread.start()
     
-    def load_model(self, model_name='base'):
+    def uninstall(self):
+        """
+        Uninstall all Whisper models by removing .pt files
+        
+        Returns:
+            tuple: (success: bool, message: str, models_removed: list)
+        """
+        try:
+            if not self.cache_dir.exists():
+                return (False, "No Whisper models found", [])
+            
+            models_removed = []
+            
+            # Remove all .pt model files
+            for model_file in self.cache_dir.glob("*.pt"):
+                try:
+                    model_name = model_file.stem
+                    model_file.unlink()
+                    models_removed.append(model_name)
+                    self.logger.info(f"Removed Whisper model: {model_name}")
+                except Exception as e:
+                    self.logger.error(f"Failed to remove {model_file}: {str(e)}")
+            
+            if models_removed:
+                return (True, f"Removed {len(models_removed)} Whisper model(s)", models_removed)
+            else:
+                return (False, "No Whisper models found to remove", [])
+                
+        except Exception as e:
+            error_msg = f"Failed to uninstall Whisper models: {str(e)}"
+            self.logger.error(error_msg)
+            return (False, error_msg, [])
+    
+    def get_size(self):
+        """
+        Get the total size of all Whisper models in MB
+        
+        Returns:
+            float: Total size in MB, or 0 if no models installed
+        """
+        try:
+            if not self.cache_dir.exists():
+                return 0
+            
+            total_size = 0
+            for model_file in self.cache_dir.glob("*.pt"):
+                total_size += model_file.stat().st_size
+            
+            return total_size / (1024 * 1024)  # Convert to MB
+        except Exception:
+            return 0
+
         """Load a Whisper model for transcription"""
         try:
             self.logger.info(f"Loading Whisper model: {model_name}")

@@ -33,7 +33,18 @@ class SynthesisTab:
             text="Text Synthesis",
             font=("Arial", 20, "bold")
         )
-        title_label.pack(pady=(0, 20))
+        title_label.pack(pady=(0, 10))
+        
+        # Explanatory text
+        info_label = ctk.CTkLabel(
+            container,
+            text="This section can only be used if you have an API Key from one of the following AI providers: Claude, OpenAI, Deepseek, Gemini. If you don't, just copy the text from the tab \"Video to Text\" and get a manual synthesis online with the AI chat that you prefer.",
+            font=("Arial", 12),
+            text_color="gray50",
+            wraplength=800,
+            justify="left"
+        )
+        info_label.pack(pady=(0, 20))
         
         # Input Section
         input_frame = ctk.CTkFrame(container, corner_radius=10)

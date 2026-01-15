@@ -73,7 +73,7 @@ class VideoToTextTab:
         # Transcribe Button
         self.transcribe_btn = ctk.CTkButton(
             container,
-            text="Transcribe Audio",
+            text="Transcribe Audio (~15 min per hour of audio)",
             height=45,
             corner_radius=10,
             font=("Arial", 14, "bold"),
