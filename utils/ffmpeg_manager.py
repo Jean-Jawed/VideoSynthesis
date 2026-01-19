@@ -4,8 +4,10 @@ FFmpeg Manager - Download and manage FFmpeg executable
 
 import os
 import sys
+import platform
 import requests
 import zipfile
+import stat
 from pathlib import Path
 from threading import Thread
 
@@ -14,17 +16,25 @@ class FFmpegManager:
     def __init__(self, logger):
         self.logger = logger
         
-        # Determine FFmpeg path
-        if os.name == 'nt':  # Windows
-            self.ffmpeg_dir = Path(os.getenv('APPDATA')) / 'VideoSynthesis'
-        else:  # Linux/Mac
+        # Determine FFmpeg path and download URL based on OS
+        system = platform.system()
+        self.logger.info(f"Detected OS: {system}")
+        
+        if system == 'Windows':
+            self.ffmpeg_dir = Path(os.getenv('APPDATA', os.path.expanduser('~'))) / 'VideoSynthesis'
+            self.ffmpeg_path = self.ffmpeg_dir / 'ffmpeg.exe'
+            self.download_url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+        elif system == 'Darwin':  # macOS
             self.ffmpeg_dir = Path.home() / '.VideoSynthesis'
+            self.ffmpeg_path = self.ffmpeg_dir / 'ffmpeg'
+            self.download_url = "https://evermeet.cx/ffmpeg/get/zip"
+        else:  # Linux
+            self.ffmpeg_dir = Path.home() / '.VideoSynthesis'
+            self.ffmpeg_path = self.ffmpeg_dir / 'ffmpeg'
+            # Default to a generic static build source if needed, otherwise leave as Windows URL as placeholder or handle Linux specifically
+            self.download_url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"
         
         self.ffmpeg_dir.mkdir(parents=True, exist_ok=True)
-        self.ffmpeg_path = self.ffmpeg_dir / 'ffmpeg.exe'
-        
-        # FFmpeg download URL (Windows 64-bit)
-        self.download_url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
     
     def is_installed(self):
         """Check if FFmpeg is installed"""
@@ -36,9 +46,10 @@ class FFmpegManager:
         """Get FFmpeg executable path"""
         if getattr(sys, 'frozen', False):
             # Running as compiled executable
-            # Check if FFmpeg is bundled (shouldn't be in our case)
+            # Check if FFmpeg is bundled
             base_path = sys._MEIPASS
-            bundled_ffmpeg = Path(base_path) / 'ffmpeg.exe'
+            ffmpeg_exe = 'ffmpeg.exe' if platform.system() == 'Windows' else 'ffmpeg'
+            bundled_ffmpeg = Path(base_path) / ffmpeg_exe
             if bundled_ffmpeg.exists():
                 return str(bundled_ffmpeg)
         
@@ -129,16 +140,36 @@ class FFmpegManager:
                 if progress_callback:
                     progress_callback(85, "Extracting FFmpeg...")
                 
-                # Extract ffmpeg.exe from zip
+                # Extract ffmpeg from zip based on OS structure
+                system = platform.system()
                 with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    # Find ffmpeg.exe in the archive
-                    for file_info in zip_ref.filelist:
-                        if file_info.filename.endswith('bin/ffmpeg.exe'):
-                            # Extract just the ffmpeg.exe file
-                            with zip_ref.open(file_info) as source:
-                                with open(self.ffmpeg_path, 'wb') as target:
-                                    target.write(source.read())
-                            break
+                    if system == 'Windows':
+                        # Find ffmpeg.exe in the archive (usually in bin/ folder)
+                        for file_info in zip_ref.filelist:
+                            if file_info.filename.endswith('bin/ffmpeg.exe'):
+                                with zip_ref.open(file_info) as source:
+                                    with open(self.ffmpeg_path, 'wb') as target:
+                                        target.write(source.read())
+                                break
+                    elif system == 'Darwin':
+                        # Evermeet zip usually contains just 'ffmpeg' at the root
+                        for file_info in zip_ref.filelist:
+                            if file_info.filename == 'ffmpeg' or file_info.filename.endswith('/ffmpeg'):
+                                with zip_ref.open(file_info) as source:
+                                    with open(self.ffmpeg_path, 'wb') as target:
+                                        target.write(source.read())
+                                # Make executable on macOS/Linux
+                                os.chmod(self.ffmpeg_path, os.stat(self.ffmpeg_path).st_mode | stat.S_IEXEC)
+                                break
+                    else:
+                        # Fallback or Linux zip handling (if zip)
+                        for file_info in zip_ref.filelist:
+                            if file_info.filename.endswith('ffmpeg'):
+                                with zip_ref.open(file_info) as source:
+                                    with open(self.ffmpeg_path, 'wb') as target:
+                                        target.write(source.read())
+                                os.chmod(self.ffmpeg_path, os.stat(self.ffmpeg_path).st_mode | stat.S_IEXEC)
+                                break
                 
                 # Clean up zip file
                 zip_path.unlink()

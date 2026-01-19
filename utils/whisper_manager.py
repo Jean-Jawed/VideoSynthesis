@@ -4,6 +4,9 @@ Whisper Manager - Download and manage Whisper models
 
 import os
 import whisper
+import ssl
+import certifi
+import platform
 from pathlib import Path
 from threading import Thread
 
@@ -11,6 +14,15 @@ from threading import Thread
 class WhisperManager:
     def __init__(self, logger):
         self.logger = logger
+        
+        # macOS SSL certificate fix
+        if platform.system() == 'Darwin':
+            self.logger.info("Applying macOS SSL certificate fix")
+            ssl_context = ssl._create_default_https_context
+            if ssl_context != ssl._create_unverified_context:
+                ssl._create_default_https_context = ssl._create_unverified_context
+            os.environ['SSL_CERT_FILE'] = certifi.where()
+            os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
         
         # Whisper cache directory (default: ~/.cache/whisper)
         self.cache_dir = Path.home() / ".cache" / "whisper"
