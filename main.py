@@ -195,7 +195,7 @@ class VideoSynthesisApp(ctk.CTk):
             width=120,
             height=28,
             corner_radius=6,
-            command=lambda: webbrowser.open("https://jawed.fr")
+            command=lambda: webbrowser.open("https://javed.fr")
         )
         link_button.grid(row=0, column=1, sticky="e", padx=10)
     
