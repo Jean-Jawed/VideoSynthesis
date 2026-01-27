@@ -101,5 +101,5 @@ A: Yes! Transcribe as many as you want. Each video is independent.
 ## Support
 
 - Check logs: `%APPDATA%/VideoSynthesis/app.log`
-- Website: https://jawed.fr
+- Website: https://javed.fr
 - For technical issues, include the log file when asking for help

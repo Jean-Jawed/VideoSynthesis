@@ -3,7 +3,7 @@
 Desktop application for downloading videos, transcribing audio to text, and generating AI-powered summaries.
 
 **Copyright © Jawed Tahir 2025**  
-Website: https://jawed.fr
+Website: https://javed.fr
 
 ## Features
 

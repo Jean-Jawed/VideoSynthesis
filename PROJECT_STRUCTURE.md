@@ -227,4 +227,4 @@ Possible additions:
 ---
 
 **Copyright © Jawed Tahir 2025**  
-Website: https://jawed.fr
+Website: https://javed.fr
